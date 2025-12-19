@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { LatLngBounds } from 'leaflet'
-import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
+import { CircleMarker, MapContainer, Popup, TileLayer, useMapEvents } from 'react-leaflet'
 import './App.css'
 
 type Aircraft = {
@@ -59,6 +59,24 @@ export default function App() {
       <MapContainer center={center} zoom={7} style={{ height: '100%', width: '100%' }}>
         <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <BoundsPoller onData={setAircraft} />
+        {aircraft.map((plane) => (
+          <CircleMarker
+            key={plane.icao24}
+            center={[plane.lat, plane.lon]}
+            radius={6}
+            pathOptions={{ color: plane.onGround ? '#ff9800' : '#1e88e5', weight: 1, fillOpacity: 0.8 }}
+          >
+            <Popup>
+              <div style={{ minWidth: 180 }}>
+                <div style={{ fontWeight: 600 }}>{plane.callsign || plane.icao24}</div>
+                <div>Country: {plane.originCountry}</div>
+                <div>Altitude: {plane.baroAltitude ? `${Math.round(plane.baroAltitude)} m` : 'N/A'}</div>
+                <div>Speed: {plane.velocity ? `${Math.round(plane.velocity)} m/s` : 'N/A'}</div>
+                <div>Heading: {plane.trueTrack ? `${Math.round(plane.trueTrack)}°` : 'N/A'}</div>
+              </div>
+            </Popup>
+          </CircleMarker>
+        ))}
       </MapContainer>
 
       <div
