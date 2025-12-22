@@ -1,42 +1,58 @@
+html,
+body,
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  height: 100%;
+  width: 100%;
+  margin: 0;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #040b16;
+  color: #0d1726;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.leaflet-container {
+  font: inherit;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.plane-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
 }
 
-.card {
-  padding: 2em;
+.plane-icon__wrapper {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transform-origin: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--plane-color, #1e88e5);
 }
 
-.read-the-docs {
-  color: #888;
+.plane-icon__halo {
+  position: absolute;
+  width: 120%;
+  height: 120%;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(4, 11, 22, 0.75);
+  box-shadow:
+    0 0 6px rgba(0, 0, 0, 0.7),
+    0 0 12px rgba(0, 0, 0, 0.45);
+}
+
+.plane-icon__wrapper svg {
+  width: 22px;
+  height: 22px;
+  fill: var(--plane-color, #1e88e5);
+  stroke: #fff;
+  stroke-width: 1.4;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
 }
