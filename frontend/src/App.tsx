@@ -20,7 +20,7 @@ function BoundsPoller({ onData }: { onData: (a: Aircraft[]) => void }) {
     onData(data.aircraft || [])
   }, [onData])
 
-  useMapEvents({
+  const map = useMapEvents({
     moveend(e) {
       fetchForBounds(e.target.getBounds())
     },
@@ -29,14 +29,21 @@ function BoundsPoller({ onData }: { onData: (a: Aircraft[]) => void }) {
     }
   })
 
-  const map = useMapEvents({})
-
   useEffect(() => {
-    const run = () => fetchForBounds(map.getBounds())
-    run()
+    if (!map) return undefined
 
-    timer.current = window.setInterval(run, 8000)
+    let cancelled = false
+    const run = () => fetchForBounds(map.getBounds())
+
+    map.whenReady(() => {
+      if (cancelled) return
+
+      run()
+      timer.current = window.setInterval(run, 8000)
+    })
+
     return () => {
+      cancelled = true
       if (timer.current) window.clearInterval(timer.current)
     }
   }, [map, fetchForBounds])
@@ -55,7 +62,7 @@ export default function App() {
   }, [aircraft, selectedId])
 
   return (
-    <div style={{ height: '100vh', width: '100vw' }}>
+    <div style={{ position: 'relative', height: '100vh', width: '100vw' }}>
       <MapContainer center={center} zoom={7} style={{ height: '100%', width: '100%' }}>
         <TileLayer
           attribution="&copy; OpenStreetMap contributors"
@@ -78,7 +85,8 @@ export default function App() {
           background: 'white',
           padding: 12,
           borderRadius: 8,
-          maxWidth: 360
+          maxWidth: 360,
+          zIndex: 1000
         }}
       >
         <div style={{ fontWeight: 700 }}>Aircraft in view: {aircraft.length}</div>

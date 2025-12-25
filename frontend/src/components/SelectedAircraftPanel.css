@@ -9,21 +9,7 @@
   padding: 12px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(10px);
-  .sel {
-  position: absolute;
-  right: 12px;
-  top: 12px;
-  width: 320px;
-  max-width: calc(100vw - 24px);
-  background: rgba(255, 255, 255, 0.94);
-  border-radius: 14px;
-  padding: 12px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
-
-  z-index: 9999; 
-}
-
+  z-index: 9999;
 }
 
 .sel__header {
