@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LatLngBounds } from 'leaflet'
 import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
 import './App.css'
@@ -9,7 +9,7 @@ import SelectedAircraftPanel from './components/SelectedAircraftPanel'
 function BoundsPoller({ onData }: { onData: (a: Aircraft[]) => void }) {
   const timer = useRef<number | null>(null)
 
-  const fetchForBounds = async (bounds: LatLngBounds) => {
+  const fetchForBounds = useCallback(async (bounds: LatLngBounds) => {
     const sw = bounds.getSouthWest()
     const ne = bounds.getNorthEast()
 
@@ -18,7 +18,7 @@ function BoundsPoller({ onData }: { onData: (a: Aircraft[]) => void }) {
     const r = await fetch(url)
     const data = await r.json()
     onData(data.aircraft || [])
-  }
+  }, [onData])
 
   useMapEvents({
     moveend(e) {
@@ -39,22 +39,20 @@ function BoundsPoller({ onData }: { onData: (a: Aircraft[]) => void }) {
     return () => {
       if (timer.current) window.clearInterval(timer.current)
     }
-  }, [map])
+  }, [map, fetchForBounds])
 
   return null
 }
 
 export default function App() {
   const [aircraft, setAircraft] = useState<Aircraft[]>([])
-  const [selected, setSelected] = useState<Aircraft | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const center = useMemo(() => [43.6532, -79.3832] as [number, number], [])
 
-  // Keep selected aircraft "fresh" as polling updates come in
-  useEffect(() => {
-    if (!selected) return
-    const fresh = aircraft.find((a) => a.icao24 === selected.icao24)
-    setSelected(fresh ?? null)
-  }, [aircraft]) // intentionally only depends on aircraft
+  const selectedAircraft = useMemo(() => {
+    if (!selectedId) return null
+    return aircraft.find((a) => a.icao24 === selectedId) ?? null
+  }, [aircraft, selectedId])
 
   return (
     <div style={{ height: '100vh', width: '100vw' }}>
@@ -67,7 +65,7 @@ export default function App() {
         <BoundsPoller onData={setAircraft} />
 
         {aircraft.map((a) => (
-          <AircraftMarker key={a.icao24} aircraft={a} onSelect={setSelected} />
+          <AircraftMarker key={a.icao24} aircraft={a} onSelect={(aircraft) => setSelectedId(aircraft.icao24)} />
         ))}
       </MapContainer>
 
@@ -88,7 +86,9 @@ export default function App() {
       </div>
 
       {/* Selected aircraft details */}
-      {selected && <SelectedAircraftPanel aircraft={selected} onClose={() => setSelected(null)} />}
+      {selectedAircraft && (
+        <SelectedAircraftPanel aircraft={selectedAircraft} onClose={() => setSelectedId(null)} />
+      )}
     </div>
   )
 }
