@@ -81,7 +81,7 @@ export default function App() {
         style={{
           position: 'absolute',
           top: 12,
-          left: 12,
+          right: 12,
           background: 'white',
           padding: 12,
           borderRadius: 8,

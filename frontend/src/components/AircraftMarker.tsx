@@ -9,6 +9,11 @@ export type Aircraft = {
   baroAltitude: number | null
   velocity: number | null
   trueTrack: number | null
+  verticalRate?: number | null
+  geoAltitude?: number | null
+  squawk?: string | null
+  positionSource?: number | null
+  timePosition?: number | null
   onGround: boolean
   originCountry: string
   lastContact?: number | null
