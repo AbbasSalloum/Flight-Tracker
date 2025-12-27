@@ -4,11 +4,20 @@ import './SelectedAircraftPanel.css'
 
 const POSITION_SOURCES = ['ADS-B', 'ASTERIX', 'MLAT'] as const
 
+type AirportInfo = {
+  code: string | null
+  name: string | null
+  city: string | null
+  country: string | null
+}
+
 type RouteInfo = {
   callsign: string
   from: string | null
   to: string | null
   route: string[] | null
+  fromAirport: AirportInfo | null
+  toAirport: AirportInfo | null
 }
 
 function title(a: Aircraft) {
@@ -29,6 +38,14 @@ function fmtCoords(lat: number, lon: number) {
 function fmtPositionSource(value?: number | null) {
   if (value === null || value === undefined) return '—'
   return POSITION_SOURCES[value] ?? `Source ${value}`
+}
+function fmtAirport(airport?: AirportInfo | null, fallback?: string | null) {
+  if (!airport) return fallback || '—'
+  const locationParts = [airport.city, airport.country].filter(Boolean).join(', ')
+  const details = [airport.name, locationParts].filter(Boolean).join(' — ')
+  const code = airport.code || fallback
+  if (details && code) return `${details} (${code})`
+  return details || code || fallback || '—'
 }
 
 export default function SelectedAircraftPanel({
@@ -85,7 +102,9 @@ export default function SelectedAircraftPanel({
     if (!aircraft.callsign?.trim()) return '—'
     if (routeStatus === 'loading') return 'Loading...'
     if (routeStatus === 'error') return 'Unavailable'
-    return routeInfo?.[field] || '—'
+    const airport = field === 'from' ? routeInfo?.fromAirport : routeInfo?.toAirport
+    const fallback = field === 'from' ? routeInfo?.from : routeInfo?.to
+    return fmtAirport(airport, fallback ?? null)
   }
 
   return (

@@ -2,20 +2,34 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import NodeCache from "node-cache";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
 const app = express();
 app.use(cors());
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const AIRPORTS_FILE = process.env.AIRPORTS_FILE || path.join(__dirname, "data/airports.json");
+const ROUTE_CACHE_FILE = process.env.ROUTE_CACHE_FILE || path.join(__dirname, "data/route-cache.json");
+const ROUTE_CACHE_SECONDS = Number(process.env.ROUTE_CACHE_SECONDS || 600);
+
 const cache = new NodeCache({ stdTTL: Number(process.env.CACHE_SECONDS || 5) });
 const routeCache = new NodeCache({
-  stdTTL: Number(process.env.ROUTE_CACHE_SECONDS || 600)
+  stdTTL: ROUTE_CACHE_SECONDS
 });
+let routeCacheStore = {};
 
 function log(...args) {
   console.log(new Date().toISOString(), "-", ...args);
 }
+
+const airports = loadAirports();
+loadRouteCacheFromDisk();
 
 const DEFAULT_TOKEN_URL =
   "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token";
@@ -96,6 +110,74 @@ function toNum(v, name) {
   return n;
 }
 
+function loadAirports() {
+  try {
+    const raw = fs.readFileSync(AIRPORTS_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    log("[Airports] Loaded", Object.keys(parsed).length, "entries");
+    return parsed;
+  } catch (err) {
+    log("[Airports] Failed to load data:", err.message);
+    return {};
+  }
+}
+
+function describeAirport(code) {
+  const ident = (code || "").trim().toUpperCase();
+  if (!ident) return null;
+  const data = airports[ident];
+  return {
+    code: ident,
+    name: data?.name || null,
+    city: data?.city || null,
+    country: data?.country || null
+  };
+}
+
+function setRouteCacheValue(key, value) {
+  routeCache.set(key, value, ROUTE_CACHE_SECONDS);
+  routeCacheStore[key] = {
+    value,
+    expiresAt: Date.now() + ROUTE_CACHE_SECONDS * 1000
+  };
+  persistRouteCacheStore();
+}
+
+function persistRouteCacheStore() {
+  try {
+    fs.mkdirSync(path.dirname(ROUTE_CACHE_FILE), { recursive: true });
+    fs.writeFileSync(ROUTE_CACHE_FILE, JSON.stringify(routeCacheStore));
+  } catch (err) {
+    log("[Routes] Failed to persist cache:", err.message);
+  }
+}
+
+function loadRouteCacheFromDisk() {
+  try {
+    if (!fs.existsSync(ROUTE_CACHE_FILE)) return;
+    const raw = fs.readFileSync(ROUTE_CACHE_FILE, "utf-8");
+    const data = JSON.parse(raw);
+    const now = Date.now();
+    let restored = 0;
+    for (const [key, entry] of Object.entries(data)) {
+      if (!entry || typeof entry !== "object") continue;
+      const expiresAt = Number(entry.expiresAt);
+      if (!expiresAt || expiresAt <= now) continue;
+      const ttlSeconds = Math.floor((expiresAt - now) / 1000);
+      if (ttlSeconds <= 0) continue;
+      routeCache.set(key, entry.value, ttlSeconds);
+      routeCacheStore[key] = { value: entry.value, expiresAt };
+      restored += 1;
+    }
+    if (restored) {
+      log("[Routes] Restored", restored, "cached routes from disk");
+    }
+  } catch (err) {
+    log("[Routes] Failed to restore cached routes:", err.message);
+    routeCacheStore = {};
+  }
+}
+
 async function fetchRouteForCallsign(callsign) {
   const trimmed = (callsign || "").trim().toUpperCase();
   if (!trimmed) return null;
@@ -125,17 +207,21 @@ async function fetchRouteForCallsign(callsign) {
       : [];
 
     if (!route.length) {
-      routeCache.set(key, ROUTE_MISS);
+      setRouteCacheValue(key, ROUTE_MISS);
       return null;
     }
 
+    const fromCode = route[0] || null;
+    const toCode = route[route.length - 1] || null;
     const payload = {
       callsign: trimmed,
       route,
-      from: route[0] || null,
-      to: route[route.length - 1] || null
+      from: fromCode,
+      to: toCode,
+      fromAirport: describeAirport(fromCode),
+      toAirport: describeAirport(toCode)
     };
-    routeCache.set(key, payload);
+    setRouteCacheValue(key, payload);
     return payload;
   } catch (err) {
     log("[Routes] Request failed:", err.message);
@@ -234,7 +320,9 @@ app.get("/api/routes/:callsign", async (req, res) => {
       callsign: callsign.trim().toUpperCase(),
       from: route?.from || null,
       to: route?.to || null,
-      route: route?.route || null
+      route: route?.route || null,
+      fromAirport: route?.fromAirport || (route?.from ? describeAirport(route.from) : null),
+      toAirport: route?.toAirport || (route?.to ? describeAirport(route.to) : null)
     });
   } catch (err) {
     const status = Number(err.status) || Number(err.statusCode) || 502;
