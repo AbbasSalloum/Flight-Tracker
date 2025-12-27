@@ -1,7 +1,15 @@
+import { useEffect, useState } from 'react'
 import type { Aircraft } from './AircraftMarker'
 import './SelectedAircraftPanel.css'
 
 const POSITION_SOURCES = ['ADS-B', 'ASTERIX', 'MLAT'] as const
+
+type RouteInfo = {
+  callsign: string
+  from: string | null
+  to: string | null
+  route: string[] | null
+}
 
 function title(a: Aircraft) {
   return a.callsign?.trim() || a.icao24.toUpperCase()
@@ -30,6 +38,56 @@ export default function SelectedAircraftPanel({
   aircraft: Aircraft
   onClose: () => void
 }) {
+  const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null)
+  const [routeStatus, setRouteStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+
+  useEffect(() => {
+    let cancelled = false
+    const callsign = aircraft.callsign?.trim()
+
+    if (!callsign) {
+      setRouteInfo(null)
+      setRouteStatus('idle')
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const controller = new AbortController()
+    setRouteStatus('loading')
+    setRouteInfo(null)
+
+    fetch(`http://localhost:8080/api/routes/${encodeURIComponent(callsign)}`, {
+      signal: controller.signal
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`Route error ${r.status}`)
+        return r.json()
+      })
+      .then((data: RouteInfo) => {
+        if (!cancelled) {
+          setRouteInfo(data)
+          setRouteStatus('ready')
+        }
+      })
+      .catch((err) => {
+        if (cancelled || err.name === 'AbortError') return
+        setRouteStatus('error')
+      })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
+  }, [aircraft.callsign])
+
+  const renderRouteValue = (field: 'from' | 'to') => {
+    if (!aircraft.callsign?.trim()) return '—'
+    if (routeStatus === 'loading') return 'Loading...'
+    if (routeStatus === 'error') return 'Unavailable'
+    return routeInfo?.[field] || '—'
+  }
+
   return (
     <div className="sel">
       <div className="sel__header">
@@ -89,6 +147,16 @@ export default function SelectedAircraftPanel({
         <div className="kv">
           <div className="kv__k">Squawk</div>
           <div className="kv__v">{aircraft.squawk?.trim() || '—'}</div>
+        </div>
+
+        <div className="kv">
+          <div className="kv__k">Departure airport</div>
+          <div className="kv__v">{renderRouteValue('from')}</div>
+        </div>
+
+        <div className="kv">
+          <div className="kv__k">Arrival airport</div>
+          <div className="kv__v">{renderRouteValue('to')}</div>
         </div>
 
         <div className="kv">

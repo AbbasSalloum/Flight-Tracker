@@ -9,6 +9,9 @@ const app = express();
 app.use(cors());
 
 const cache = new NodeCache({ stdTTL: Number(process.env.CACHE_SECONDS || 5) });
+const routeCache = new NodeCache({
+  stdTTL: Number(process.env.ROUTE_CACHE_SECONDS || 600)
+});
 
 function log(...args) {
   console.log(new Date().toISOString(), "-", ...args);
@@ -21,6 +24,8 @@ const TOKEN_URLS = process.env.OPENSKY_TOKEN_URL
   : [DEFAULT_TOKEN_URL];
 let cachedOAuthToken = null;
 let oauthTokenExpiresAt = 0;
+const ROUTES_URL = process.env.OPENSKY_ROUTES_URL || "https://opensky-network.org/api/routes";
+const ROUTE_MISS = "__no_route__";
 
 async function getOAuthToken() {
   const clientId = process.env.OPENSKY_CLIENT_ID;
@@ -89,6 +94,53 @@ function toNum(v, name) {
     throw err;
   }
   return n;
+}
+
+async function fetchRouteForCallsign(callsign) {
+  const trimmed = (callsign || "").trim().toUpperCase();
+  if (!trimmed) return null;
+
+  const key = `route:${trimmed}`;
+  const cached = routeCache.get(key);
+  if (cached) {
+    if (cached === ROUTE_MISS) return null;
+    return cached;
+  }
+
+  const url = `${ROUTES_URL}?callsign=${encodeURIComponent(trimmed)}`;
+  log("[Routes] Fetching route for", trimmed);
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      const text = await response.text();
+      const error = new Error(`Routes error ${response.status}: ${text}`);
+      error.status = response.status >= 500 ? 502 : response.status;
+      throw error;
+    }
+
+    const data = await response.json();
+    const route = Array.isArray(data?.route)
+      ? data.route.filter((code) => typeof code === "string" && code.trim().length > 0)
+      : [];
+
+    if (!route.length) {
+      routeCache.set(key, ROUTE_MISS);
+      return null;
+    }
+
+    const payload = {
+      callsign: trimmed,
+      route,
+      from: route[0] || null,
+      to: route[route.length - 1] || null
+    };
+    routeCache.set(key, payload);
+    return payload;
+  } catch (err) {
+    log("[Routes] Request failed:", err.message);
+    throw err;
+  }
 }
 
 // GET /api/airspace?lamin=43.5&lomin=-80&lamax=44&lomax=-79
@@ -168,6 +220,25 @@ app.get("/api/airspace", async (req, res) => {
     const status = Number(e.status) || Number(e.statusCode) || 400;
     log("[OpenSky] Request failed:", e.message);
     res.status(status).json({ error: e.message });
+  }
+});
+
+app.get("/api/routes/:callsign", async (req, res) => {
+  try {
+    const callsign = req.params.callsign;
+    if (!callsign || !callsign.trim()) {
+      return res.status(400).json({ error: "Missing callsign" });
+    }
+    const route = await fetchRouteForCallsign(callsign);
+    res.json({
+      callsign: callsign.trim().toUpperCase(),
+      from: route?.from || null,
+      to: route?.to || null,
+      route: route?.route || null
+    });
+  } catch (err) {
+    const status = Number(err.status) || Number(err.statusCode) || 502;
+    res.status(status).json({ error: err.message });
   }
 });
 
