@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
 import './App.css'
 
 import AircraftMarker, { type Aircraft } from './components/AircraftMarker'
-import SelectedAircraftPanel from './components/SelectedAircraftPanel'
+import AircraftSidePanel from './components/AircraftSidePanel'
 
 function BoundsPoller({ onData }: { onData: (a: Aircraft[]) => void }) {
   const timer = useRef<number | null>(null)
@@ -94,9 +94,7 @@ export default function App() {
       </div>
 
       {/* Selected aircraft details */}
-      {selectedAircraft && (
-        <SelectedAircraftPanel aircraft={selectedAircraft} onClose={() => setSelectedId(null)} />
-      )}
+      <AircraftSidePanel aircraft={selectedAircraft} onClose={() => setSelectedId(null)} />
     </div>
   )
 }

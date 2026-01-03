@@ -257,7 +257,13 @@ app.get("/api/airspace", async (req, res) => {
       `&lomax=${encodeURIComponent(lomax)}`;
 
     const headers = {};
-    const accessToken = await getOAuthToken();
+    let accessToken = null;
+    try {
+      accessToken = await getOAuthToken();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      log("[OpenSky] Continuing without OAuth token:", message);
+    }
     if (accessToken) {
       headers.Authorization = `Bearer ${accessToken}`;
     } else if (process.env.OPENSKY_USERNAME && process.env.OPENSKY_PASSWORD) {
