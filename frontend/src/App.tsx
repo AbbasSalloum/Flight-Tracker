@@ -6,6 +6,16 @@ import './App.css'
 import AircraftMarker, { type Aircraft } from './components/AircraftMarker'
 import AircraftSidePanel from './components/AircraftSidePanel'
 
+function MapClickCloser({ onClick }: { onClick: () => void }) {
+  useMapEvents({
+    click() {
+      onClick()
+    }
+  })
+
+  return null
+}
+
 function BoundsPoller({ onData }: { onData: (a: Aircraft[]) => void }) {
   const timer = useRef<number | null>(null)
 
@@ -69,6 +79,7 @@ export default function App() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        <MapClickCloser onClick={() => setSelectedId(null)} />
         <BoundsPoller onData={setAircraft} />
 
         {aircraft.map((a) => (
