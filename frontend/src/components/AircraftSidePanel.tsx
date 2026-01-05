@@ -25,7 +25,8 @@ export default function AircraftSidePanel({ aircraft, onClose }: Props) {
   const [summary, setSummary] = useState<any>(null)
 
   useEffect(() => {
-    if (!aircraft) {
+    const icao24 = aircraft?.icao24
+    if (!icao24) {
       setSummary(null)
       return
     }
@@ -33,7 +34,7 @@ export default function AircraftSidePanel({ aircraft, onClose }: Props) {
     let cancelled = false
     setSummary(null)
 
-    fetch(`http://localhost:8080/api/flight/summary?icao24=${aircraft.icao24}`)
+    fetch(`http://localhost:8080/api/flight/summary?icao24=${icao24}`)
       .then((r) => r.json())
       .then((data) => {
         if (!cancelled) setSummary(data)
@@ -45,7 +46,7 @@ export default function AircraftSidePanel({ aircraft, onClose }: Props) {
     return () => {
       cancelled = true
     }
-  }, [aircraft])
+  }, [aircraft?.icao24])
 
   if (!aircraft) return null
 

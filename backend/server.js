@@ -23,6 +23,8 @@ const routeCache = new NodeCache({
   stdTTL: ROUTE_CACHE_SECONDS
 });
 let routeCacheStore = {};
+const FLIGHT_SUMMARY_CACHE_SECONDS = Number(process.env.FLIGHT_SUMMARY_CACHE_SECONDS || 120);
+const flightSummaryCache = new NodeCache({ stdTTL: FLIGHT_SUMMARY_CACHE_SECONDS });
 
 function log(...args) {
   console.log(new Date().toISOString(), "-", ...args);
@@ -323,6 +325,16 @@ app.get("/api/flight/summary", async (req, res) => {
       return res.status(400).json({ error: "icao24 required" });
     }
 
+    log("[Flights] Summary lookup for", icao24);
+    const cacheKey = (icao24 || "").trim().toLowerCase();
+    if (cacheKey) {
+      const cached = flightSummaryCache.get(cacheKey);
+      if (cached !== undefined) {
+        log("[Flights] summary cache hit for", icao24);
+        return res.json(cached);
+      }
+    }
+
     const now = Math.floor(Date.now() / 1000);
     const begin = now - 6 * 3600; // last 6 hours
 
@@ -342,25 +354,31 @@ app.get("/api/flight/summary", async (req, res) => {
     const r = await fetch(url, { headers });
     if (!r.ok) {
       const text = await r.text();
+      log("[Flights] summary error", r.status, text);
       return res.status(r.status).send(text);
     }
 
     const flights = await r.json();
     if (!flights.length) {
+      log("[Flights] summary miss for", icao24);
+      if (cacheKey) flightSummaryCache.set(cacheKey, null);
       return res.json(null);
     }
 
     // pick most recent flight
     const f = flights[flights.length - 1];
 
-    res.json({
+    const payload = {
       icao24: f.icao24,
       callsign: (f.callsign || "").trim(),
       fromAirport: f.estDepartureAirport,
       toAirport: f.estArrivalAirport,
       firstSeen: f.firstSeen,
       lastSeen: f.lastSeen || null
-    });
+    };
+    if (cacheKey) flightSummaryCache.set(cacheKey, payload);
+    res.json(payload);
+    log("[Flights] summary hit", icao24, "route", f.estDepartureAirport, "->", f.estArrivalAirport);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
