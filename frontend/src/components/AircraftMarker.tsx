@@ -17,6 +17,9 @@ export type Aircraft = {
   onGround: boolean
   originCountry: string
   lastContact?: number | null
+  distanceFlownKm?: number | null
+  remainingKm?: number | null
+  progressPct?: number | null
 }
 
 export default function AircraftMarker({

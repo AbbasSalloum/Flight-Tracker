@@ -315,6 +315,57 @@ app.get("/api/airspace", async (req, res) => {
   }
 });
 
+// GET /api/flight/summary?icao24=abcd12
+app.get("/api/flight/summary", async (req, res) => {
+  try {
+    const { icao24 } = req.query;
+    if (!icao24) {
+      return res.status(400).json({ error: "icao24 required" });
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const begin = now - 6 * 3600; // last 6 hours
+
+    const url =
+      `https://opensky-network.org/api/flights/aircraft` +
+      `?icao24=${encodeURIComponent(icao24)}` +
+      `&begin=${begin}&end=${now}`;
+
+    const headers = {};
+    if (process.env.OPENSKY_USERNAME && process.env.OPENSKY_PASSWORD) {
+      const basicToken = Buffer.from(
+        `${process.env.OPENSKY_USERNAME}:${process.env.OPENSKY_PASSWORD}`
+      ).toString("base64");
+      headers.Authorization = `Basic ${basicToken}`;
+    }
+
+    const r = await fetch(url, { headers });
+    if (!r.ok) {
+      const text = await r.text();
+      return res.status(r.status).send(text);
+    }
+
+    const flights = await r.json();
+    if (!flights.length) {
+      return res.json(null);
+    }
+
+    // pick most recent flight
+    const f = flights[flights.length - 1];
+
+    res.json({
+      icao24: f.icao24,
+      callsign: (f.callsign || "").trim(),
+      fromAirport: f.estDepartureAirport,
+      toAirport: f.estArrivalAirport,
+      firstSeen: f.firstSeen,
+      lastSeen: f.lastSeen || null
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get("/api/routes/:callsign", async (req, res) => {
   try {
     const callsign = req.params.callsign;

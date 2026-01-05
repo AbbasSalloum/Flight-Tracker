@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import type { Aircraft } from './AircraftMarker'
+import FlightRouteBlock from './FlightRouteBlock'
 
 type Props = {
   aircraft: Aircraft | null
@@ -20,6 +22,31 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function AircraftSidePanel({ aircraft, onClose }: Props) {
+  const [summary, setSummary] = useState<any>(null)
+
+  useEffect(() => {
+    if (!aircraft) {
+      setSummary(null)
+      return
+    }
+
+    let cancelled = false
+    setSummary(null)
+
+    fetch(`http://localhost:8080/api/flight/summary?icao24=${aircraft.icao24}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setSummary(data)
+      })
+      .catch(() => {
+        if (!cancelled) setSummary(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [aircraft])
+
   if (!aircraft) return null
 
   const subtitleCountry = aircraft.originCountry?.trim() || 'Unknown country'
@@ -39,6 +66,17 @@ export default function AircraftSidePanel({ aircraft, onClose }: Props) {
         <button type="button" onClick={onClose} aria-label="Close side panel">
           ✕
         </button>
+      </div>
+
+      <div className="side-panel__section">
+        <FlightRouteBlock
+          from={summary?.fromAirport}
+          to={summary?.toAirport}
+          departedAt={summary?.firstSeen}
+          distanceKm={Math.round(aircraft.distanceFlownKm || 0)}
+          remainingKm={Math.round(aircraft.remainingKm || 0)}
+          progressPct={aircraft.progressPct}
+        />
       </div>
 
       <div className="side-panel__section">
