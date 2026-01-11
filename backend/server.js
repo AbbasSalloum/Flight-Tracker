@@ -384,6 +384,48 @@ app.get("/api/flight/summary", async (req, res) => {
   }
 });
 
+// GET /api/flight/track?icao24=abcd12
+app.get("/api/flight/track", async (req, res) => {
+  try {
+    const { icao24 } = req.query;
+    if (!icao24) {
+      return res.status(400).json({ error: "icao24 required" });
+    }
+
+    const url = `https://opensky-network.org/api/tracks/all?icao24=${encodeURIComponent(icao24)}`;
+    const headers = {};
+    if (process.env.OPENSKY_USERNAME && process.env.OPENSKY_PASSWORD) {
+      const token = Buffer.from(
+        `${process.env.OPENSKY_USERNAME}:${process.env.OPENSKY_PASSWORD}`
+      ).toString("base64");
+      headers.Authorization = `Basic ${token}`;
+    }
+
+    const r = await fetch(url, { headers });
+    if (!r.ok) {
+      const text = await r.text();
+      return res.status(r.status).send(text);
+    }
+
+    const data = await r.json();
+
+    // Track format: [time, lat, lon, alt, track]
+    const path = (data.path || [])
+      .filter((p) => Number.isFinite(p[1]) && Number.isFinite(p[2]))
+      .map((p) => [p[1], p[2]]);
+
+    res.json({
+      icao24,
+      callsign: data.callsign,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      path
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get("/api/routes/:callsign", async (req, res) => {
   try {
     const callsign = req.params.callsign;

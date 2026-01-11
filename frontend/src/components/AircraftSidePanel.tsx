@@ -76,7 +76,7 @@ export default function AircraftSidePanel({ aircraft, onClose }: Props) {
           departedAt={summary?.firstSeen}
           distanceKm={Math.round(aircraft.distanceFlownKm || 0)}
           remainingKm={Math.round(aircraft.remainingKm || 0)}
-          progressPct={aircraft.progressPct}
+          progressPct={aircraft.progressPct ?? undefined}
         />
       </div>
 

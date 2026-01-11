@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { LatLngBounds } from 'leaflet'
-import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
+import { MapContainer, Polyline, TileLayer, useMapEvents } from 'react-leaflet'
 import './App.css'
 
 import AircraftMarker, { type Aircraft } from './components/AircraftMarker'
@@ -63,13 +63,22 @@ function BoundsPoller({ onData }: { onData: (a: Aircraft[]) => void }) {
 
 export default function App() {
   const [aircraft, setAircraft] = useState<Aircraft[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedAircraft, setSelectedAircraft] = useState<Aircraft | null>(null)
+  const [flightPath, setFlightPath] = useState<[number, number][]>([])
   const center = useMemo(() => [43.6532, -79.3832] as [number, number], [])
 
-  const selectedAircraft = useMemo(() => {
-    if (!selectedId) return null
-    return aircraft.find((a) => a.icao24 === selectedId) ?? null
-  }, [aircraft, selectedId])
+  const handleAircraftSelect = useCallback(async (plane: Aircraft) => {
+    setSelectedAircraft(plane)
+    setFlightPath([])
+
+    try {
+      const r = await fetch(`http://localhost:8080/api/flight/track?icao24=${plane.icao24}`)
+      const data = await r.json()
+      setFlightPath(data?.path || [])
+    } catch {
+      setFlightPath([])
+    }
+  }, [])
 
   return (
     <div style={{ position: 'relative', height: '100vh', width: '100vw' }}>
@@ -79,12 +88,28 @@ export default function App() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        <MapClickCloser onClick={() => setSelectedId(null)} />
+        <MapClickCloser
+          onClick={() => {
+            setSelectedAircraft(null)
+            setFlightPath([])
+          }}
+        />
         <BoundsPoller onData={setAircraft} />
 
         {aircraft.map((a) => (
-          <AircraftMarker key={a.icao24} aircraft={a} onSelect={(aircraft) => setSelectedId(aircraft.icao24)} />
+          <AircraftMarker key={a.icao24} aircraft={a} onSelect={handleAircraftSelect} />
         ))}
+
+        {flightPath.length > 1 && (
+          <Polyline
+            positions={flightPath}
+            pathOptions={{
+              color: '#f2b400',
+              weight: 3,
+              opacity: 0.9
+            }}
+          />
+        )}
       </MapContainer>
 
       {/* Small HUD */}
@@ -105,7 +130,13 @@ export default function App() {
       </div>
 
       {/* Selected aircraft details */}
-      <AircraftSidePanel aircraft={selectedAircraft} onClose={() => setSelectedId(null)} />
+      <AircraftSidePanel
+        aircraft={selectedAircraft}
+        onClose={() => {
+          setSelectedAircraft(null)
+          setFlightPath([])
+        }}
+      />
     </div>
   )
 }
