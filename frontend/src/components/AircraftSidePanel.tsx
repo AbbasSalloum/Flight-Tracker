@@ -7,6 +7,25 @@ type Props = {
   onClose: () => void
 }
 
+type FlightSummaryAirport = {
+  code: string | null
+  name: string | null
+  city: string | null
+  country: string | null
+  time: number | null
+}
+
+type FlightSummary = {
+  icao24: string
+  callsign?: string | null
+  fromAirport?: string | null
+  toAirport?: string | null
+  firstSeen?: number | null
+  lastSeen?: number | null
+  departure?: FlightSummaryAirport | null
+  arrival?: FlightSummaryAirport | null
+}
+
 function formatMetric(value?: number | null, suffix = '') {
   if (value === null || value === undefined || Number.isNaN(value)) return 'N/A'
   return `${Math.round(value)}${suffix}`
@@ -22,7 +41,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function AircraftSidePanel({ aircraft, onClose }: Props) {
-  const [summary, setSummary] = useState<any>(null)
+  const [summary, setSummary] = useState<FlightSummary | null>(null)
 
   useEffect(() => {
     const icao24 = aircraft?.icao24
@@ -34,10 +53,17 @@ export default function AircraftSidePanel({ aircraft, onClose }: Props) {
     let cancelled = false
     setSummary(null)
 
-    fetch(`http://localhost:8080/api/flight/summary?icao24=${icao24}`)
-      .then((r) => r.json())
+    const params = new URLSearchParams({ icao24 })
+    const callsign = aircraft.callsign?.trim()
+    if (callsign) params.set('callsign', callsign)
+
+    fetch(`http://localhost:8080/api/flight/summary?${params.toString()}`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error('Summary request failed')
+        return (await r.json()) as FlightSummary | null
+      })
       .then((data) => {
-        if (!cancelled) setSummary(data)
+        if (!cancelled) setSummary(data ?? null)
       })
       .catch(() => {
         if (!cancelled) setSummary(null)
@@ -71,11 +97,10 @@ export default function AircraftSidePanel({ aircraft, onClose }: Props) {
 
       <div className="side-panel__section">
         <FlightRouteBlock
-          from={summary?.fromAirport}
-          to={summary?.toAirport}
-          departedAt={summary?.firstSeen}
-          distanceKm={Math.round(aircraft.distanceFlownKm || 0)}
-          remainingKm={Math.round(aircraft.remainingKm || 0)}
+          departure={summary?.departure}
+          arrival={summary?.arrival}
+          distanceKm={formatDistanceMetric(aircraft.distanceFlownKm)}
+          remainingKm={formatDistanceMetric(aircraft.remainingKm)}
           progressPct={aircraft.progressPct ?? undefined}
         />
       </div>
@@ -91,4 +116,9 @@ export default function AircraftSidePanel({ aircraft, onClose }: Props) {
       </div>
     </aside>
   )
+}
+
+function formatDistanceMetric(value?: number | null) {
+  if (value === null || value === undefined || Number.isNaN(value)) return undefined
+  return Math.round(value)
 }

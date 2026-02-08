@@ -25,6 +25,9 @@ const routeCache = new NodeCache({
 let routeCacheStore = {};
 const FLIGHT_SUMMARY_CACHE_SECONDS = Number(process.env.FLIGHT_SUMMARY_CACHE_SECONDS || 120);
 const flightSummaryCache = new NodeCache({ stdTTL: FLIGHT_SUMMARY_CACHE_SECONDS });
+const FLIGHT_LOOKBACK_SECONDS = Number(process.env.FLIGHT_LOOKBACK_SECONDS || 6 * 3600);
+const AIRPORT_LOOKUP_SECONDS = Number(process.env.AIRPORT_LOOKUP_SECONDS || 3 * 3600);
+const MAX_AIRPORT_WINDOW = 48 * 3600;
 
 function log(...args) {
   console.log(new Date().toISOString(), "-", ...args);
@@ -134,6 +137,107 @@ function describeAirport(code) {
     city: data?.city || null,
     country: data?.country || null
   };
+}
+
+function buildBasicAuthHeaders() {
+  const user = process.env.OPENSKY_USERNAME;
+  const pass = process.env.OPENSKY_PASSWORD;
+  if (!user || !pass) return {};
+  const token = Buffer.from(`${user}:${pass}`).toString("base64");
+  return { Authorization: `Basic ${token}` };
+}
+
+function normalizeAirportCode(code) {
+  const trimmed = (code || "").trim().toUpperCase();
+  return trimmed || null;
+}
+
+function buildAirportDetails(code, time, fallbackAirport = null) {
+  const normalizedCode = normalizeAirportCode(code || fallbackAirport?.code);
+  const described = normalizedCode ? describeAirport(normalizedCode) : null;
+  const source = described || fallbackAirport;
+  if (!normalizedCode && !source) return null;
+  return {
+    code: normalizedCode || source?.code || null,
+    name: source?.name || null,
+    city: source?.city || null,
+    country: source?.country || null,
+    time: time || null
+  };
+}
+
+async function findAirportFlight(type, airportCode, icao24, referenceTime = null) {
+  const normalizedCode = normalizeAirportCode(airportCode);
+  const targetIcao = (icao24 || "").trim().toLowerCase();
+  if (!normalizedCode || !targetIcao) return null;
+
+  const now = Math.floor(Date.now() / 1000);
+  let end = referenceTime ? referenceTime + AIRPORT_LOOKUP_SECONDS : now;
+  let begin = referenceTime ? Math.max(referenceTime - AIRPORT_LOOKUP_SECONDS, 0) : Math.max(end - AIRPORT_LOOKUP_SECONDS, 0);
+  if (end - begin > MAX_AIRPORT_WINDOW) {
+    end = begin + MAX_AIRPORT_WINDOW;
+  }
+
+  const endpoint = type === "arrival" ? "flights/arrival" : "flights/departure";
+  const url =
+    `https://opensky-network.org/api/${endpoint}` +
+    `?airport=${encodeURIComponent(normalizedCode)}` +
+    `&begin=${begin}` +
+    `&end=${end}`;
+
+  try {
+    const headers = buildBasicAuthHeaders();
+    const response = await fetch(url, { headers });
+    if (response.status === 404) {
+      return null;
+    }
+    if (!response.ok) {
+      const text = await response.text();
+      log(`[Flights] ${type} lookup error ${response.status}: ${text}`);
+      return null;
+    }
+
+    const flights = await response.json();
+    if (!Array.isArray(flights)) return null;
+    return flights.find(
+      (flight) => typeof flight?.icao24 === "string" && flight.icao24.toLowerCase() === targetIcao
+    );
+  } catch (err) {
+    log(`[Flights] ${type} lookup failed:`, err.message);
+    return null;
+  }
+}
+
+async function buildFlightRecordFromRoute(icao24, routeData) {
+  if (!routeData) return null;
+  const record = {
+    icao24,
+    callsign: routeData.callsign || null,
+    estDepartureAirport: routeData.from || null,
+    estArrivalAirport: routeData.to || null,
+    firstSeen: null,
+    lastSeen: null
+  };
+
+  const departure = routeData.from
+    ? await findAirportFlight("departure", routeData.from, icao24)
+    : null;
+  const arrival = routeData.to ? await findAirportFlight("arrival", routeData.to, icao24) : null;
+
+  if (departure) {
+    record.estDepartureAirport = departure.estDepartureAirport || record.estDepartureAirport;
+    record.estArrivalAirport = record.estArrivalAirport || departure.estArrivalAirport || null;
+    record.firstSeen = departure.firstSeen || record.firstSeen;
+    record.lastSeen = departure.lastSeen || record.lastSeen;
+  }
+
+  if (arrival) {
+    record.estArrivalAirport = arrival.estArrivalAirport || record.estArrivalAirport;
+    record.firstSeen = record.firstSeen || arrival.firstSeen || null;
+    record.lastSeen = arrival.lastSeen || record.lastSeen;
+  }
+
+  return record;
 }
 
 function setRouteCacheValue(key, value) {
@@ -321,6 +425,7 @@ app.get("/api/airspace", async (req, res) => {
 app.get("/api/flight/summary", async (req, res) => {
   try {
     const { icao24 } = req.query;
+    const callsignHint = req.query.callsign;
     if (!icao24) {
       return res.status(400).json({ error: "icao24 required" });
     }
@@ -336,49 +441,111 @@ app.get("/api/flight/summary", async (req, res) => {
     }
 
     const now = Math.floor(Date.now() / 1000);
-    const begin = now - 6 * 3600; // last 6 hours
+    const begin = now - FLIGHT_LOOKBACK_SECONDS;
 
     const url =
       `https://opensky-network.org/api/flights/aircraft` +
       `?icao24=${encodeURIComponent(icao24)}` +
       `&begin=${begin}&end=${now}`;
 
-    const headers = {};
-    if (process.env.OPENSKY_USERNAME && process.env.OPENSKY_PASSWORD) {
-      const basicToken = Buffer.from(
-        `${process.env.OPENSKY_USERNAME}:${process.env.OPENSKY_PASSWORD}`
-      ).toString("base64");
-      headers.Authorization = `Basic ${basicToken}`;
+    const headers = buildBasicAuthHeaders();
+
+    let summaryFlight = null;
+    let summarySource = "aircraft";
+    let response = await fetch(url, { headers });
+    if (!response.ok) {
+      const text = await response.text();
+      log("[Flights] summary error", response.status, text);
+    } else {
+      const flights = await response.json();
+      if (Array.isArray(flights) && flights.length) {
+        summaryFlight = flights[flights.length - 1];
+      }
     }
 
-    const r = await fetch(url, { headers });
-    if (!r.ok) {
-      const text = await r.text();
-      log("[Flights] summary error", r.status, text);
-      return res.status(r.status).send(text);
+    const callsign = (summaryFlight?.callsign || callsignHint || "").trim().toUpperCase();
+    let routeInfo = null;
+    if (callsign) {
+      try {
+        routeInfo = await fetchRouteForCallsign(callsign);
+      } catch (err) {
+        log("[Flights] route lookup failed:", err.message);
+      }
     }
 
-    const flights = await r.json();
-    if (!flights.length) {
+    if (!summaryFlight) {
+      summaryFlight = await buildFlightRecordFromRoute(icao24, routeInfo);
+      if (summaryFlight) summarySource = "route";
+    }
+
+    if (!summaryFlight) {
       log("[Flights] summary miss for", icao24);
       if (cacheKey) flightSummaryCache.set(cacheKey, null);
       return res.json(null);
     }
 
-    // pick most recent flight
-    const f = flights[flights.length - 1];
+    let departureCode = normalizeAirportCode(summaryFlight.estDepartureAirport);
+    let arrivalCode = normalizeAirportCode(summaryFlight.estArrivalAirport);
+    let departureTime = summaryFlight.firstSeen || null;
+    let arrivalTime = summaryFlight.lastSeen || null;
+
+    if (!departureCode && routeInfo?.from) {
+      const departure = await findAirportFlight(
+        "departure",
+        routeInfo.from,
+        icao24,
+        summaryFlight.firstSeen || null
+      );
+      if (departure) {
+        departureCode = routeInfo.from;
+        departureTime = departure.firstSeen || departureTime;
+        arrivalCode = arrivalCode || departure.estArrivalAirport || routeInfo.to || null;
+        arrivalTime = arrivalTime || departure.lastSeen || null;
+        if (summarySource === "aircraft") summarySource = "enriched";
+      }
+    }
+
+    if (!arrivalCode && routeInfo?.to) {
+      const arrival = await findAirportFlight(
+        "arrival",
+        routeInfo.to,
+        icao24,
+        summaryFlight.lastSeen || null
+      );
+      if (arrival) {
+        arrivalCode = routeInfo.to;
+        arrivalTime = arrival.lastSeen || arrivalTime;
+        departureCode = departureCode || arrival.estDepartureAirport || routeInfo.from || null;
+        departureTime = departureTime || arrival.firstSeen || null;
+        if (summarySource === "aircraft") summarySource = "enriched";
+      }
+    }
 
     const payload = {
-      icao24: f.icao24,
-      callsign: (f.callsign || "").trim(),
-      fromAirport: f.estDepartureAirport,
-      toAirport: f.estArrivalAirport,
-      firstSeen: f.firstSeen,
-      lastSeen: f.lastSeen || null
+      icao24: summaryFlight.icao24,
+      callsign: callsign || summaryFlight.callsign || null,
+      fromAirport: departureCode,
+      toAirport: arrivalCode,
+      firstSeen: departureTime,
+      lastSeen: arrivalTime,
+      route: routeInfo?.route || null,
+      source: summarySource
     };
+
+    payload.departure = buildAirportDetails(departureCode, departureTime, routeInfo?.fromAirport);
+    payload.arrival = buildAirportDetails(arrivalCode, arrivalTime, routeInfo?.toAirport);
+
     if (cacheKey) flightSummaryCache.set(cacheKey, payload);
     res.json(payload);
-    log("[Flights] summary hit", icao24, "route", f.estDepartureAirport, "->", f.estArrivalAirport);
+
+    log(
+      "[Flights] summary hit",
+      icao24,
+      "route",
+      departureCode || "???",
+      "->",
+      arrivalCode || "???"
+    );
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -393,13 +560,7 @@ app.get("/api/flight/track", async (req, res) => {
     }
 
     const url = `https://opensky-network.org/api/tracks/all?icao24=${encodeURIComponent(icao24)}`;
-    const headers = {};
-    if (process.env.OPENSKY_USERNAME && process.env.OPENSKY_PASSWORD) {
-      const token = Buffer.from(
-        `${process.env.OPENSKY_USERNAME}:${process.env.OPENSKY_PASSWORD}`
-      ).toString("base64");
-      headers.Authorization = `Basic ${token}`;
-    }
+    const headers = buildBasicAuthHeaders();
 
     const r = await fetch(url, { headers });
     if (!r.ok) {

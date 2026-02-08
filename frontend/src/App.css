@@ -183,9 +183,16 @@ body {
 }
 
 .fr24-route__top {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
+  gap: 8px;
+}
+
+.fr24-route__airport {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .fr24-route__code {
@@ -197,11 +204,29 @@ body {
   font-size: 18px;
 }
 
+.fr24-route__label {
+  font-size: 12px;
+  color: #60687c;
+}
+
 .fr24-route__times {
   margin-top: 8px;
   display: flex;
   justify-content: space-between;
   font-size: 14px;
+  gap: 12px;
+}
+
+.fr24-route__times > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fr24-route__times span {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #7c8595;
 }
 
 .fr24-route__track {
