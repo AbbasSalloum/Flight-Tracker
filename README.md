@@ -31,14 +31,26 @@ cd flight-tracker
 2. Configure environment (create `.env`):
    ```dotenv
    PORT=8080
+   CACHE_SECONDS=20
 
-   # OpenSky account credentials (Basic auth)
-   OPENSKY_USERNAME=your_username
-   OPENSKY_PASSWORD=your_password
+   # Choose either OAuth client credentials (preferred)…
+   OPENSKY_CLIENT_ID=your_client_id
+   OPENSKY_CLIENT_SECRET=your_client_secret
+
+   # …or fallback to Basic auth credentials
+   # OPENSKY_USERNAME=your_username
+   # OPENSKY_PASSWORD=your_password
 
    # Optional: OAuth client for higher limits
-   # OPENSKY_CLIENT_ID=...
-   # OPENSKY_CLIENT_SECRET=...
+   # OPENSKY_SCOPE=...
+   # OPENSKY_TOKEN_URL=...
+
+   # Optional: tweak local cache behavior / data paths
+   # ROUTE_CACHE_SECONDS=600
+   # FLIGHT_SUMMARY_CACHE_SECONDS=120
+   # AIRPORT_LOOKUP_SECONDS=10800
+   # AIRPORTS_FILE=backend/data/airports.json
+   # ROUTE_CACHE_FILE=backend/data/route-cache.json
    ```
 3. Start the API server:
    ```bash
