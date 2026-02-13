@@ -4,7 +4,7 @@ import { MapContainer, Polyline, TileLayer, useMapEvents } from 'react-leaflet'
 import './App.css'
 
 import AircraftMarker, { type Aircraft } from './components/AircraftMarker'
-import AircraftSidePanel from './components/AircraftSidePanel'
+import FlightBottomSheet, { type FlightSummary } from './components/FlightBottomSheet'
 
 function MapClickCloser({ onClick }: { onClick: () => void }) {
   useMapEvents({
@@ -65,24 +65,70 @@ export default function App() {
   const [aircraft, setAircraft] = useState<Aircraft[]>([])
   const [selectedAircraft, setSelectedAircraft] = useState<Aircraft | null>(null)
   const [flightPath, setFlightPath] = useState<[number, number][]>([])
+  const [flightSummary, setFlightSummary] = useState<FlightSummary | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
   const center = useMemo(() => [43.6532, -79.3832] as [number, number], [])
+
+  const closeSheet = useCallback(() => {
+    setSheetOpen(false)
+  }, [])
+
+  useEffect(() => {
+    if (sheetOpen) return undefined
+    if (!selectedAircraft) {
+      setFlightPath([])
+      setFlightSummary(null)
+      return undefined
+    }
+
+    const timer = window.setTimeout(() => {
+      setSelectedAircraft(null)
+      setFlightPath([])
+      setFlightSummary(null)
+    }, 240)
+
+    return () => window.clearTimeout(timer)
+  }, [sheetOpen, selectedAircraft])
 
   const handleAircraftSelect = useCallback(async (plane: Aircraft) => {
     setSelectedAircraft(plane)
+    setSheetOpen(true)
     setFlightPath([])
+    setFlightSummary(null)
 
     try {
-      const r = await fetch(`http://localhost:8080/api/flight/track?icao24=${plane.icao24}`)
-      const data = await r.json()
-      setFlightPath(data?.path || [])
+      const [trackResponse, summaryResponse] = await Promise.all([
+        fetch(`http://localhost:8080/api/flight/track?icao24=${plane.icao24}`),
+        fetch(buildSummaryUrl(plane))
+      ])
+
+      if (trackResponse.ok) {
+        const trackData = await trackResponse.json()
+        setFlightPath(trackData?.path || [])
+      } else {
+        setFlightPath([])
+      }
+
+      if (summaryResponse.ok) {
+        const summaryData = (await summaryResponse.json()) as FlightSummary | null
+        setFlightSummary(summaryData ?? null)
+      } else {
+        setFlightSummary(null)
+      }
     } catch {
       setFlightPath([])
+      setFlightSummary(null)
     }
   }, [])
 
   return (
     <div style={{ position: 'relative', height: '100vh', width: '100vw' }}>
-      <MapContainer center={center} zoom={7} style={{ height: '100%', width: '100%' }}>
+      <MapContainer
+        center={center}
+        zoom={7}
+        style={{ height: '100%', width: '100%' }}
+        className="map-dim"
+      >
         <TileLayer
           attribution="&copy; OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -90,8 +136,7 @@ export default function App() {
 
         <MapClickCloser
           onClick={() => {
-            setSelectedAircraft(null)
-            setFlightPath([])
+            closeSheet()
           }}
         />
         <BoundsPoller onData={setAircraft} />
@@ -130,13 +175,19 @@ export default function App() {
       </div>
 
       {/* Selected aircraft details */}
-      <AircraftSidePanel
+      <FlightBottomSheet
         aircraft={selectedAircraft}
-        onClose={() => {
-          setSelectedAircraft(null)
-          setFlightPath([])
-        }}
+        open={sheetOpen}
+        summary={flightSummary}
+        onClose={closeSheet}
       />
     </div>
   )
+}
+
+function buildSummaryUrl(aircraft: Aircraft) {
+  const params = new URLSearchParams({ icao24: aircraft.icao24 })
+  const callsign = aircraft.callsign?.trim()
+  if (callsign) params.set('callsign', callsign)
+  return `http://localhost:8080/api/flight/summary?${params.toString()}`
 }

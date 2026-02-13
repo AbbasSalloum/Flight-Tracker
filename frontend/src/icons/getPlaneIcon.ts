@@ -1,36 +1,40 @@
 import { divIcon } from 'leaflet'
 
-const planeIconCache = new Map<string, ReturnType<typeof divIcon>>()
+const cache = new Map<string, ReturnType<typeof divIcon>>()
 
-function isFiniteNumber(value: number | null | undefined): value is number {
-  return typeof value === 'number' && Number.isFinite(value)
+function normalizeRotation(track: number | null) {
+  if (typeof track !== 'number' || !Number.isFinite(track)) return 0
+  const h = track % 360
+  return h < 0 ? h + 360 : h
 }
 
-function normalizeHeading(value: number | null): number {
-  if (!isFiniteNumber(value)) return 0
-  const heading = value % 360
-  return heading < 0 ? heading + 360 : heading
-}
-
-export function getPlaneIcon(heading: number | null, onGround: boolean) {
-  const h = Math.round(normalizeHeading(heading))
-  const cacheKey = `${h}:${onGround ? 'g' : 'a'}`
-  const cached = planeIconCache.get(cacheKey)
+export function getPlaneIcon(track: number | null, onGround: boolean) {
+  const rotation = normalizeRotation(track)
+  const color = onGround ? '#999999' : '#FFD400'
+  const key = `${rotation}:${color}`
+  const cached = cache.get(key)
   if (cached) return cached
 
   const icon = divIcon({
-    className: 'plane-min',
+    className: '',
     html: `
-      <div class="plane-min__wrap ${onGround ? 'is-ground' : 'is-air'}" style="transform: rotate(${h}deg);">
-        <div class="plane-min__pin"></div>
-        <div class="plane-min__arrow"></div>
+      <div style="
+        transform: rotate(${rotation}deg);
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="${color}">
+          <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9L2 14v2l8-2.5V20l-2 1.5V23l3.5-1 3.5 1v-1.5L13 20v-6.5L21 16z"/>
+        </svg>
       </div>
     `,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
-    popupAnchor: [0, -10],
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
   })
 
-  planeIconCache.set(cacheKey, icon)
+  cache.set(key, icon)
   return icon
 }

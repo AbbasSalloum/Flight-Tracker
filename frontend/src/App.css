@@ -16,6 +16,17 @@ body {
   font: inherit;
 }
 
+.map-dim .leaflet-pane.leaflet-tile-pane {
+  filter: brightness(0.78) saturate(0.85) contrast(1.05);
+}
+
+.map-dim .leaflet-overlay-pane canvas,
+.map-dim .leaflet-marker-pane,
+.map-dim .leaflet-shadow-pane,
+.map-dim .leaflet-overlay-pane svg {
+  filter: none;
+}
+
 .plane-icon {
   display: flex;
   align-items: center;
@@ -55,56 +66,6 @@ body {
   stroke: #fff;
   stroke-width: 1.4;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
-}
-
-/* ===== Minimal aircraft markers ===== */
-.plane-min {
-  background: transparent !important;
-  border: none !important;
-}
-
-.plane-min__wrap {
-  width: 18px;
-  height: 18px;
-  position: relative;
-  transform-origin: center;
-}
-
-/* Tiny center dot */
-.plane-min__pin {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 5px;
-  height: 5px;
-  transform: translate(-50%, -50%);
-  border-radius: 999px;
-  background: currentColor;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-}
-
-/* Triangle arrow */
-.plane-min__arrow {
-  position: absolute;
-  left: 50%;
-  top: 1px;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-bottom: 10px solid currentColor;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
-  opacity: 0.95;
-}
-
-.plane-min__wrap.is-air {
-  color: #2f7cff;
-}
-
-.plane-min__wrap.is-ground {
-  color: #ff9f2f;
 }
 
 .side-panel {

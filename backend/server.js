@@ -608,6 +608,40 @@ app.get("/api/routes/:callsign", async (req, res) => {
   }
 });
 
-app.listen(process.env.PORT || 8080, () => {
-  log(`Backend running on port ${process.env.PORT || 8080}`);
-});
+function parsePort(raw) {
+  if (raw === undefined) {
+    return { port: 8080, envDefined: false };
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    log(`[Server] Invalid PORT "${raw}", falling back to 8080`);
+    return { port: 8080, envDefined: false };
+  }
+  return { port: parsed, envDefined: true };
+}
+
+function startServer(port, { allowRetry } = { allowRetry: false }) {
+  const server = app.listen(port, () => {
+    const address = server.address();
+    const actualPort = typeof address === "object" && address ? address.port : port;
+    log(`Backend running on port ${actualPort}`);
+  });
+
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      if (!allowRetry) {
+        log(`[Server] Port ${port} is already in use. Stop the other process or set PORT to a different value.`);
+        process.exit(1);
+      }
+      log(`[Server] Port ${port} is busy. Trying a random open port...`);
+      startServer(0, { allowRetry: false });
+      return;
+    }
+
+    log("[Server] Failed to start:", err.message);
+    process.exit(1);
+  });
+}
+
+const { port: desiredPort, envDefined } = parsePort(process.env.PORT);
+startServer(desiredPort, { allowRetry: !envDefined });
