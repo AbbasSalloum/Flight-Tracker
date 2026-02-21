@@ -1,0 +1,92 @@
+.sheetBackdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+  z-index: 700;
+}
+
+.sheetBackdropOpen {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sheet {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 800;
+  transform: translateY(110%);
+  transition: transform 0.22s ease;
+}
+
+.sheetOpen {
+  transform: translateY(0);
+}
+
+.sheetCard {
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(16, 20, 30, 0.92);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(16px);
+  overflow: hidden;
+}
+
+.sheetGrab {
+  height: 28px;
+  display: grid;
+  place-items: center;
+}
+
+.sheetGrab::before {
+  content: '';
+  width: 44px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 12px 10px 12px;
+}
+
+.sheetTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sheetTitle strong {
+  font-size: 16px;
+}
+
+.sheetSubtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.iconBtn {
+  height: 36px;
+  width: 36px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.iconBtn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+

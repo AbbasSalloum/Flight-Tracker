@@ -1,0 +1,106 @@
+.list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  padding-right: 6px;
+  max-height: calc(100vh - 160px);
+}
+
+.listItem {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.listItem:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.listRowTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.callsignPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 750;
+  letter-spacing: 0.3px;
+}
+
+.airlineDot {
+  height: 26px;
+  width: 26px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 179, 0, 0.35), transparent 60%),
+    rgba(255, 255, 255, 0.05);
+  display: grid;
+  place-items: center;
+}
+
+.metaPills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.18);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.bigCodeRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bigCode {
+  font-size: 30px;
+  font-weight: 850;
+  letter-spacing: 0.8px;
+}
+
+.arrow {
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255, 179, 0, 0.2), rgba(255, 179, 0, 0.75), rgba(255, 179, 0, 0.2));
+  position: relative;
+  border-radius: 999px;
+}
+
+.arrow::after {
+  content: '';
+  position: absolute;
+  right: -2px;
+  top: -5px;
+  width: 12px;
+  height: 12px;
+  border-right: 2px solid rgba(255, 179, 0, 0.9);
+  border-top: 2px solid rgba(255, 179, 0, 0.9);
+  transform: rotate(45deg);
+}
+
+.smallText {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.52);
+}
+

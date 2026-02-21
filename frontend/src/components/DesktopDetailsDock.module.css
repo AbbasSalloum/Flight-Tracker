@@ -1,0 +1,86 @@
+.detailsDock {
+  position: relative;
+  padding: 14px;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(10, 12, 18, 0.6), rgba(10, 12, 18, 0.25));
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 10px 12px 10px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(16, 20, 30, 0.75);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(14px);
+}
+
+.topbarTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 750;
+  letter-spacing: 0.2px;
+}
+
+.appBadge {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 179, 0, 0.35), transparent 60%),
+    rgba(255, 255, 255, 0.05);
+  display: grid;
+  place-items: center;
+}
+
+.iconBtn {
+  height: 36px;
+  width: 36px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+
+.iconBtn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.panelCard {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: rgba(16, 20, 30, 0.75);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(14px);
+  overflow: hidden;
+}
+
+.panelBody {
+  padding: 12px;
+}
+
+.smallText {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.muted {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+@media (max-width: 1100px) {
+  .detailsDock {
+    display: none;
+  }
+}
