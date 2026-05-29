@@ -9,14 +9,30 @@ type BoundsPollerProps = {
 
 export function BoundsPoller({ onData }: BoundsPollerProps) {
   const timer = useRef<number | null>(null)
+  const activeController = useRef<AbortController | null>(null)
 
   const fetchForBounds = useCallback(async (bounds: LatLngBounds) => {
+    if (activeController.current) {
+      activeController.current.abort()
+    }
+    const controller = new AbortController()
+    activeController.current = controller
+
     const sw = bounds.getSouthWest()
     const ne = bounds.getNorthEast()
-    const url = `http://localhost:8080/api/airspace?lamin=${sw.lat}&lomin=${sw.lng}&lamax=${ne.lat}&lomax=${ne.lng}`
-    const r = await fetch(url)
-    const data = await r.json()
-    onData(data.aircraft || [])
+    const url = `/api/airspace?lamin=${sw.lat}&lomin=${sw.lng}&lamax=${ne.lat}&lomax=${ne.lng}`
+    try {
+      const r = await fetch(url, { signal: controller.signal })
+      if (!r.ok) throw new Error(`HTTP error ${r.status}`)
+      const data = await r.json()
+      if (!controller.signal.aborted) {
+        onData(data.aircraft || [])
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('Error fetching airspace:', err)
+      }
+    }
   }, [onData])
 
   const map = useMapEvents({
@@ -34,6 +50,7 @@ export function BoundsPoller({ onData }: BoundsPollerProps) {
     timer.current = window.setInterval(run, 8000)
     return () => {
       if (timer.current) window.clearInterval(timer.current)
+      if (activeController.current) activeController.current.abort()
     }
   }, [map, fetchForBounds])
 

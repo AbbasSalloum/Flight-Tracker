@@ -249,12 +249,27 @@ function setRouteCacheValue(key, value) {
   persistRouteCacheStore();
 }
 
-function persistRouteCacheStore() {
+let isWriting = false;
+let pendingWrite = false;
+
+async function persistRouteCacheStore() {
+  if (isWriting) {
+    pendingWrite = true;
+    return;
+  }
+  isWriting = true;
   try {
-    fs.mkdirSync(path.dirname(ROUTE_CACHE_FILE), { recursive: true });
-    fs.writeFileSync(ROUTE_CACHE_FILE, JSON.stringify(routeCacheStore));
+    const dir = path.dirname(ROUTE_CACHE_FILE);
+    await fs.promises.mkdir(dir, { recursive: true });
+    await fs.promises.writeFile(ROUTE_CACHE_FILE, JSON.stringify(routeCacheStore), "utf-8");
   } catch (err) {
     log("[Routes] Failed to persist cache:", err.message);
+  } finally {
+    isWriting = false;
+    if (pendingWrite) {
+      pendingWrite = false;
+      persistRouteCacheStore();
+    }
   }
 }
 
@@ -620,7 +635,7 @@ function parsePort(raw) {
   return { port: parsed, envDefined: true };
 }
 
-function startServer(port, { allowRetry } = { allowRetry: false }) {
+function startServer(port) {
   const server = app.listen(port, () => {
     const address = server.address();
     const actualPort = typeof address === "object" && address ? address.port : port;
@@ -629,13 +644,8 @@ function startServer(port, { allowRetry } = { allowRetry: false }) {
 
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {
-      if (!allowRetry) {
-        log(`[Server] Port ${port} is already in use. Stop the other process or set PORT to a different value.`);
-        process.exit(1);
-      }
-      log(`[Server] Port ${port} is busy. Trying a random open port...`);
-      startServer(0, { allowRetry: false });
-      return;
+      log(`[Server] Port ${port} is already in use. Stop the other process or set PORT in the .env file to a different value.`);
+      process.exit(1);
     }
 
     log("[Server] Failed to start:", err.message);
@@ -643,5 +653,5 @@ function startServer(port, { allowRetry } = { allowRetry: false }) {
   });
 }
 
-const { port: desiredPort, envDefined } = parsePort(process.env.PORT);
-startServer(desiredPort, { allowRetry: !envDefined });
+const { port: desiredPort } = parsePort(process.env.PORT);
+startServer(desiredPort);

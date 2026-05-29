@@ -15,18 +15,18 @@ export function useFlightDetails(selected: Aircraft | null) {
       return
     }
 
-    let cancelled = false
+    const controller = new AbortController()
     const fetchTrackAndSummary = async () => {
       try {
-        const trackUrl = `http://localhost:8080/api/flight/track?icao24=${selected.icao24}`
+        const trackUrl = `/api/flight/track?icao24=${selected.icao24}`
         const params = new URLSearchParams({ icao24: selected.icao24 })
         const trimmedCallsign = selected.callsign?.trim()
         if (trimmedCallsign) params.set('callsign', trimmedCallsign)
-        const summaryUrl = `http://localhost:8080/api/flight/summary?${params.toString()}`
+        const summaryUrl = `/api/flight/summary?${params.toString()}`
 
         const [trackRes, summaryRes] = await Promise.all([
-          fetch(trackUrl),
-          fetch(summaryUrl)
+          fetch(trackUrl, { signal: controller.signal }),
+          fetch(summaryUrl, { signal: controller.signal })
         ])
 
         let nextPath: [number, number][] = []
@@ -55,12 +55,13 @@ export function useFlightDetails(selected: Aircraft | null) {
           }
         }
 
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setFlightPath(nextPath)
           setFlightSummary(summary)
         }
-      } catch {
-        if (!cancelled) {
+      } catch (err: any) {
+        if (err.name === 'AbortError') return
+        if (!controller.signal.aborted) {
           setFlightPath([])
           setFlightSummary(null)
         }
@@ -68,7 +69,7 @@ export function useFlightDetails(selected: Aircraft | null) {
     }
     fetchTrackAndSummary()
     return () => {
-      cancelled = true
+      controller.abort()
     }
   }, [selected])
 

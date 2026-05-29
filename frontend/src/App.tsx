@@ -24,12 +24,6 @@ export default function App() {
   const clearSelection = () => setSelected(null)
 
   useEffect(() => {
-    if (!selected) return
-    const stillVisible = aircraft.some((plane) => plane.icao24 === selected.icao24)
-    if (!stillVisible) setSelected(null)
-  }, [aircraft, selected])
-
-  useEffect(() => {
     if (isMobile) setSidebarOpen(true)
   }, [isMobile])
 
